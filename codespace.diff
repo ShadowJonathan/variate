@@ -1,0 +1,331 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 7290d25..0e2c3f4 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,2 +1,2 @@
+ [workspace]
+-members = ["cli"]
++members = ["cli", "lib", "adapters/*"]
+diff --git a/adapters/synapse/Cargo.toml b/adapters/synapse/Cargo.toml
+new file mode 100644
+index 0000000..c10376d
+--- /dev/null
++++ b/adapters/synapse/Cargo.toml
+@@ -0,0 +1,10 @@
++[package]
++name = "variate_synapse"
++version = "0.1.0"
++edition = "2018"
++
++# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
++
++[dependencies]
++postgres = "0.19.1"
++variate_lib = { path = "../../lib" }
+diff --git a/adapters/synapse/src/lib.rs b/adapters/synapse/src/lib.rs
+new file mode 100644
+index 0000000..1efd31c
+--- /dev/null
++++ b/adapters/synapse/src/lib.rs
+@@ -0,0 +1,139 @@
++use std::cell::{Cell, RefCell};
++
++use postgres::Client;
++use variate_lib::{
++    traits::{
++        BIter, PduExtractor, PduInserter, ReadReceiptsExtractor, ReadReceiptsInserter,
++        RoomExtractor, RoomInserter, ToDeviceMessageExtractor, ToDeviceMessageInserter,
++        UserExtractor, UserInserter,
++    },
++    Extractor, Inserter,
++};
++
++pub fn make_extractor() -> Box<dyn Extractor> {
++    todo!()
++}
++
++pub fn make_inserter() -> Box<dyn Inserter> {
++    todo!()
++}
++
++struct DatabasePuck {
++    client: RefCell<Client>,
++}
++
++pub struct SynapseExtractor {
++    puck: DatabasePuck,
++}
++
++impl Extractor for SynapseExtractor {
++    fn pdu_e(&self) -> &dyn PduExtractor {
++        self
++    }
++
++    fn rr_e(&self) -> &dyn ReadReceiptsExtractor {
++        self
++    }
++
++    fn room_e(&self) -> &dyn RoomExtractor {
++        self
++    }
++
++    fn usr_e(&self) -> &dyn UserExtractor {
++        self
++    }
++
++    fn td_e(&self) -> &dyn ToDeviceMessageExtractor {
++        self
++    }
++}
++
++impl PduExtractor for SynapseExtractor {
++    fn for_room(&self, room: &variate_lib::types::RoomId) -> BIter<variate_lib::types::Pdu> {
++        self.puck.client.borrow_mut()
++    }
++}
++
++impl ReadReceiptsExtractor for SynapseExtractor {
++    fn for_room(&self, room: &variate_lib::types::RoomId) -> variate_lib::types::ReadReceipts {
++        todo!()
++    }
++}
++
++impl RoomExtractor for SynapseExtractor {
++    fn all_known_ids(&self) -> BIter<variate_lib::types::RoomId> {
++        todo!()
++    }
++}
++
++impl UserExtractor for SynapseExtractor {
++    fn all_local_ids(&self) -> BIter<variate_lib::types::UserId> {
++        todo!()
++    }
++}
++
++impl ToDeviceMessageExtractor for SynapseExtractor {
++    fn all(&self) -> BIter<variate_lib::types::ToDeviceMessage> {
++        todo!()
++    }
++}
++
++pub struct SynapseInserter {
++    puck: DatabasePuck,
++}
++
++impl Inserter for SynapseInserter {
++    fn pdu_i(&mut self) -> &mut dyn PduInserter {
++        self
++    }
++
++    fn rr_i(&mut self) -> &mut dyn ReadReceiptsInserter {
++        self
++    }
++
++    fn room_i(&mut self) -> &mut dyn RoomInserter {
++        self
++    }
++
++    fn usr_i(&mut self) -> &mut dyn UserInserter {
++        self
++    }
++
++    fn td_i(&mut self) -> &mut dyn ToDeviceMessageInserter {
++        self
++    }
++}
++
++impl PduInserter for SynapseInserter {
++    fn add_to_room(&mut self, room: &variate_lib::types::RoomId, pdu: variate_lib::types::Pdu) {
++        todo!()
++    }
++}
++
++impl ReadReceiptsInserter for SynapseInserter {
++    fn into_room(
++        &mut self,
++        room: &variate_lib::types::RoomId,
++        rr: variate_lib::types::ReadReceipts,
++    ) {
++        todo!()
++    }
++}
++
++impl RoomInserter for SynapseInserter {
++    fn skeleton_room(&mut self, room: variate_lib::types::RoomId) {
++        todo!()
++    }
++}
++
++impl UserInserter for SynapseInserter {
++    fn skeleton_user(&mut self, id: variate_lib::types::UserId) {
++        todo!()
++    }
++}
++
++impl ToDeviceMessageInserter for SynapseInserter {
++    fn add(&mut self, message: variate_lib::types::ToDeviceMessage) {
++        todo!()
++    }
++}
+diff --git a/graph.md b/graph.md
+new file mode 100644
+index 0000000..fea3761
+--- /dev/null
++++ b/graph.md
+@@ -0,0 +1 @@
++lib -> adapters -> cli
+\ No newline at end of file
+diff --git a/lib/Cargo.toml b/lib/Cargo.toml
+new file mode 100644
+index 0000000..9748163
+--- /dev/null
++++ b/lib/Cargo.toml
+@@ -0,0 +1,10 @@
++[package]
++name = "variate_lib"
++version = "0.1.0"
++edition = "2018"
++
++# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
++
++[dependencies]
++serde = { version = "1.0.130", features = ["derive"] }
++serde_json = "1.0.67"
+diff --git a/lib/src/lib.rs b/lib/src/lib.rs
+new file mode 100644
+index 0000000..fe7dae5
+--- /dev/null
++++ b/lib/src/lib.rs
+@@ -0,0 +1,20 @@
++pub mod traits;
++pub mod types;
++
++use traits::*;
++
++pub trait Extractor {
++    fn pdu_e(&self) -> &dyn PduExtractor;
++    fn rr_e(&self) -> &dyn ReadReceiptsExtractor;
++    fn room_e(&self) -> &dyn RoomExtractor;
++    fn usr_e(&self) -> &dyn UserExtractor;
++    fn td_e(&self) -> &dyn ToDeviceMessageExtractor;
++}
++
++pub trait Inserter {
++    fn pdu_i(&mut self) -> &mut dyn PduInserter;
++    fn rr_i(&mut self) -> &mut dyn ReadReceiptsInserter;
++    fn room_i(&mut self) -> &mut dyn RoomInserter;
++    fn usr_i(&mut self) -> &mut dyn UserInserter;
++    fn td_i(&mut self) -> &mut dyn ToDeviceMessageInserter;
++}
+diff --git a/lib/src/traits.rs b/lib/src/traits.rs
+new file mode 100644
+index 0000000..d6d04c1
+--- /dev/null
++++ b/lib/src/traits.rs
+@@ -0,0 +1,45 @@
++use super::types;
++
++pub type BIter<T> = Box<dyn Iterator<Item = T>>;
++
++// user -> room -> PDU -> RR
++
++pub trait PduExtractor {
++    fn for_room(&self, room: &types::RoomId) -> BIter<types::Pdu>;
++}
++
++pub trait PduInserter {
++    fn add_to_room(&mut self, room: &types::RoomId, pdu: types::Pdu);
++}
++
++pub trait RoomExtractor {
++    fn all_known_ids(&self) -> BIter<types::RoomId>;
++}
++
++pub trait RoomInserter {
++    fn skeleton_room(&mut self, room: types::RoomId);
++}
++
++pub trait UserExtractor {
++    fn all_local_ids(&self) -> BIter<types::UserId>;
++}
++
++pub trait UserInserter {
++    fn skeleton_user(&mut self, id: types::UserId);
++}
++
++pub trait ReadReceiptsExtractor {
++    fn for_room(&self, room: &types::RoomId) -> types::ReadReceipts;
++}
++
++pub trait ReadReceiptsInserter {
++    fn into_room(&mut self, room: &types::RoomId, rr: types::ReadReceipts);
++}
++
++pub trait ToDeviceMessageExtractor {
++    fn all(&self) -> BIter<types::ToDeviceMessage>;
++}
++
++pub trait ToDeviceMessageInserter {
++    fn add(&mut self, message: types::ToDeviceMessage);
++}
+diff --git a/lib/src/types.rs b/lib/src/types.rs
+new file mode 100644
+index 0000000..9f9f473
+--- /dev/null
++++ b/lib/src/types.rs
+@@ -0,0 +1,55 @@
++use std::collections::{HashMap, HashSet};
++
++use serde::{Deserialize, Serialize};
++use serde_json::{map::Map, value::Value};
++
++// unvetted user ID
++#[repr(transparent)]
++pub struct UserId(String);
++
++#[repr(transparent)]
++pub struct EventId(String);
++
++#[repr(transparent)]
++pub struct RoomId(String);
++
++#[repr(transparent)]
++pub struct DeviceId(String);
++
++pub enum Untrusted<T> {
++    Re(T),
++    Un(Value),
++}
++
++#[derive(Serialize, Deserialize, Debug)]
++pub struct Pdu {
++    #[serde(flatten)]
++    value: Map<String, Value>,
++}
++
++impl Pdu {
++    // None = invalid
++    pub fn is_state(&self) -> Option<bool> {
++        match self.value.get("state_key") {
++            Some(Value::String(_)) => Some(true),
++            Some(_) => None,
++            None => Some(false),
++        }
++    }
++}
++
++pub struct ReadReceipts(HashMap<UserId, EventId>);
++
++pub enum ToDeviceVariant {
++    Incoming,
++    Outgoing,
++}
++
++pub struct ToDeviceMessage {
++    user: UserId,
++    device: DeviceId,
++
++    direction: ToDeviceVariant,
++
++    message: Value,
++}
