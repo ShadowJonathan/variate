@@ -1,2 +1,2 @@
 [workspace]
-members = ["cli"]
+members = ["cli", "lib", "adapters/*"]
